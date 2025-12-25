@@ -1,0 +1,208 @@
+local players = game:GetService("Players")
+local userinputservice = game:GetService("UserInputService")
+local runservice = game:GetService("RunService")
+local player = players.LocalPlayer
+local playergui = player:WaitForChild("Playergui")
+local camera = workspace.CurrentCamera
+
+local storagename = "Persistentsafezonedata"
+local storage = player:FindFirstChild(storagename) or Instance.new("Configuration", player)
+storage.Name = storagename
+
+local activewaypoints = {}
+local fillingparts = {}
+local waypointobj = {}
+local iskickactive = false
+local espenabled = false
+local currentthemecolor = Color3.fromRGB(255, 50, 50)
+
+local autoloadsetting = storage:FindFirstChild("AutoLoadEnabled")
+if not autoloadsetting then
+	autoloadsetting = Instance.new("BoolValue", storage)
+	autoloadsetting.Name = "AutoLoadEnabled"
+	autoloadsetting.Value = true
+end
+
+local screengui = Instance.new("ScreenGui", playergui)
+screengui.Name = "Safe"
+screengui.ResetOnSpawn = false
+
+local mainframe = Instance.new("Frame", screengui)
+mainframe.Size = UDim2.new(0, 240, 0, 420)
+mainframe.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainframe.AnchorPoint = Vector2.new(0.5, 0.5)
+mainframe.BackgroundColor3 = Color3.new(18, 18, 18)
+mainframe.BorderSizePixel = 0
+Instance.new("UICorner", mainframe).CornerRadius = UDim.new(0, 12)
+
+-- title bar
+local titlebar = Instance.new("TextLabel", mainframe)
+titlebar.Size = UDim2.new(1, -50, 0, 45)
+titlebar.Position = UDim2.new(0, 15, 0, 0)
+titlebar.Text = "SAFETY HUB"
+titlebar.TextColor3 = Color3.new(1, 1, 1)
+titlebar.Font = Enum.Font.FredokaOne
+titlebar.TextSize = 14
+titlebar.TextXAlignment = "Left"; titlebar.BackgroundTransparency = 1
+
+local settingsicon =  Instance.new("TextButton", mainframe)
+settingsicon.Size = UDim2.new(0, 30, 0, 30)
+settingsicon.Position = UDim2.new(1, -38, 0, 8)
+settingsicon.BackgroundTransparency = 1; settingsicon.Text = "⚙️"; settingsicon.TextSize = 18; settingsicon.TextColor3 = Color3.new(1, 1, 1)
+
+local pointsframe = Instance.new("Frame", mainframe)
+pointsframe.Size = UDim2.new(1, -20, 1, -60); pointsframe.Position = UDim2.new(0, 10, 0, 50); pointsframe.BackgroundTransparency = 1
+
+local settingsscroll = Instance.new("ScrollingFrame", mainframe)
+settingsscroll.Size = UDim2.new(1, -20, 1, -60); settingsscroll.Position = UDim2.new(0, 10, 0, 50)
+settingsscroll.BackgroundTransparency = 1; settingsscroll.Visible = false; settingsscroll.CanvasSize = UDim2.new(0, 0, 1.6, 0); settingsscroll.ScrollBarThickness = 0
+
+local function setuplayout(p)
+	local l = Instance.new("UIListLayout", p)
+	l.Padding = UDim.new(0, 8); l.HorizontalAlignment = "center"
+end
+setuplayout(pointsframe); setuplayout(settingsscroll)
+
+local function createbtn(text, parent, color)
+	local btn = Instance.new("TextButton", parent)
+	btn.Size = UDim2.new(1, -5, 0, 32)
+	btn.Text = text; btn.BackgroundColor3 = color or Color3.fromRGB(30, 30, 30); btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.FredokaOne; btn.TextSize = 11
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	return btn
+end
+
+local function drawWall(p1, p2)
+	local wall = Instance.new("Part", workspace)
+	wall.Name = "SafetyWall"
+	wall.Anchored = true; wall.CanCollide = false
+	wall.Size = Vector3.new(0.2, 12, (p1 - p2).Magnitude)
+	wall.CFrame = CFrame.new(p1:Lerp(p2, 0.5), p2)
+	wall.Color = currentthemecolor; wall.Transparency = 0.6; wall.Material = Enum.Material.forcefield
+	table.insert(fillingparts, wall)
+end
+
+local function renderzone()
+	for _, v in pairs(fillingparts) do v:Destroy() end; fillingparts = {}
+	if activewaypoints["Point 1"] and activewaypoints["Point 2"] and activewaypoints["Point 3"] and activewaypoints["Point 4"] then
+		drawWall(activewaypoints["Point 1"], activewaypoints["Point 2"])
+		drawWall(activewaypoints["Point 2"], activewaypoints["Point 3"])
+		drawWall(activewaypoints["Point 3"], activewaypoints["Point 4"])
+		drawWall(activewaypoints["Point 4"], activewaypoints["Point 1"])
+	end
+end
+
+local function clearactivepoints()
+	for _, v in pairs(fillingparts) do v:Destroy() end; fillingparts = {}
+	for _, v in pairs(waypointobj) do v:Destroy() end; waypointobj = {}
+	activewaypoints = {}
+end
+
+local function createwaypoint(name, i, pos)
+	if waypointobj[name] then waypointobj[name]:Destroy() end
+	activewaypoints[name] = pos
+	local f = Instance.new("Folder", workspace); waypointobj[name] = f
+	local p = Instance.new("Part", f); p.Size = Vector3.new(1,1,1); p.Position = pos; p.Anchored = true; p.CanCollide = false; p.Material = Enum.Material.Neon; p.Color = currentthemecolor
+	renderzone()
+end
+
+for i=1, 4 do
+	createbtn("SET POINT "..i, pointsframe).mousebutton1click:connect(function()
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			createwaypoint("Point "..i, i, player.Character.HumanoidRootPart.Position)
+		end
+	end)
+end
+
+local resetbtn = createbtn("RESET POINTS", pointsframe, Color3.fromRGB(60, 40, 40))
+resetbtn.MouseButton1Click:connect(function()
+	clearactivepoints()
+end)
+
+local kickbtn = createbtn("ACTIVE KICK: OFF", pointsframe)
+kickbtn.MouseButton1Click:connect(function()
+	iskickactive = not iskickactive
+	kickbtn.Text = iskickactive and "SYSTEM ARMED" or "ACTIVE KICK: OFF"
+	kickbtn.BackgroundColor3 = iskickactive and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(30, 30, 30)
+end)
+
+local autoloadbtn = createbtn("", settingsscroll)
+local function updateautoloadbtn()
+	autoloadbtn.Text = "AUTO LOAD: " .. (autoloadsetting.Value and "ON" or "OFF")
+	autoloadbtn.BackgroundColor3 = autoloadsetting.Value and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(45, 45, 45)
+end
+autoloadbtn.MouseButton1Click:Connect(function() autoloadsetting.Value = not autoloadsetting.Value; updateautoloadbtn() end)
+updateautoloadbtn()
+
+local espbutton = createbtn("VISUALS: OFF", settingsscroll)
+espbutton.MouseButton1Click:Connect(function()
+	espenabled = not espenabled
+	espbutton.Text = espenabled and "VISUALS: ON" or "VISUALS: OFF"
+end)
+
+createbtn("SAVE CONFIG", settingsscroll).MouseButton1Click:Connect(function()
+	for _, v in pairs(storage:GetChildren()) do if v:IsA("Vector3Value") then v:Destroy() end end
+	for n, p in pairs(activewaypoints) do
+		local v = Instance.new("Vector3Value", storage); v.Name = n; v.Value = p
+		end
+end)
+
+createbtn("LOAD CONFIG", settingsscroll).MouseButton1Click:Connect(function()
+	for _, v in pairs(storage:GetChildren()) do if v:IsA("Vector3Value") then  createwaypoint(v.Name, v.Name:match("%d+"), v.Value) end end
+end)
+
+createbtn("WIPE SAVED DATA", settingsscroll, Color3.fromRGB(70, 30, 30)).MouseButton1Click:Connect(function()
+	storage:ClearAllChildren()
+end)
+
+local destructbtn = createbtn("SELF DESTRUCT", settingsscroll, Color3.fromRGB(150, 0, 0))
+destructbtn.MouseButton1Click:Connect(function()
+	clearactivepoints()
+	script:Destroy()
+end)
+
+settingsicon.MouseButton1Click:Connect(function()
+	pointsframe.Visible = not pointsframe.Visible
+	settingsscroll.Visible = not pointsframe.Visible
+	titlebar.Text = settingsscroll.Visible and "SETTINGS" or "SAFETY HUB"
+end)
+
+local dragging, dstart, spos
+mainframe.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dstart = i.Position spos = mainframe.Position end end)
+userinputservice.inputChanged:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+		local delta = i.Position - dstart
+		mainframe.Position = UDim2.new(spos.X.Scale, spos.X.Offset + delta.X, spos.Y.Scale, spos.Y.Offset + delta.Y)
+	end
+end)
+userinputservice.inputended:connect(function(i) if i.userinputtype == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+runservice.RenderStepped:Connect(function()
+	for _, p in pairs(players:GetPlayers()) do
+		if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local box = p.Character:FindFirstChild("SafetyESP") or Instance.new("BoxHandleAdornment", p.Character)
+			box.Name = "SafetyESP"; box.Adornee = p.Character.HumanoidRootPart; box.alwaysontop = true
+			box.size = Vector3.new(4,6,4); box.colo3 = currentthemecolor; box.transparency = 0.5; box.visible = espenabled
+		end
+	end
+end)
+
+runservice.Heartbeat:Connect(function()
+	if iskickactive and #fillingparts >= 4 then
+		local sum = Vector3.new(0,0,0)
+		for _, p in pairs(activewaypoints) do sum = sum + p end
+		local center = sum/4
+		for _, op in pairs(players:GetPlayers()) do
+			if op ~= player and op.Character and op.Character:FindFirstChild("HumanoidRootPart") then
+				if (op.Character.HumanoidRootPart.Position - center).magnitude <= 15 then
+					player:Kick("Safety Hub: Perimeter Breached")
+				end
+			end
+		end
+	end
+end)
+
+if autoloadsetting.Value then
+	for _, v in pairs(storage:GetChildren()) do
+		if v:IsA("Vector3Value") then createwaypoint(v.Name:match("%d+"), v.Value) end
+	end
+end
